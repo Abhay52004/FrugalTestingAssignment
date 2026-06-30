@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Canvas Stock Terminal</title>
+    <style>
+        body {
+            margin: 0;
+            background-color: #0b0f19;
+            color: #f3f4f6;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            overflow: hidden;
+        }
+        h1 {
+            font-size: 1.5rem;
+            margin-bottom: 1rem;
+            color: #3b82f6;
+        }
+        #canvas-container {
+            border: 2px solid #1e293b;
+            border-radius: 8px;
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5);
+            background-color: #020617;
+        }
+        #status-panel {
+            margin-top: 1rem;
+            font-size: 0.9rem;
+            color: #64748b;
+        }
+        #error-boundary {
+            margin-top: 1rem;
+            padding: 0.75rem 1.5rem;
+            background-color: #7f1d1d;
+            border: 1px solid #dc2626;
+            border-radius: 6px;
+            color: #fca5a5;
+            display: none;
+            max-width: 380px;
+            text-align: center;
+            font-weight: 500;
+        }
+    </style>
+</head>
+<body>
+    <h1>Data-Streaming Live Stock Terminal</h1>
+    <div id="canvas-container">
+        <canvas id="stockCanvas" width="400" height="400"></canvas>
+    </div>
+    <div id="status-panel">System Status: Connecting to WebSocket...</div>
+    <div id="error-boundary" id="error-box">ERROR: System State Corrupted</div>
+
+    <script>
+        const canvas = document.getElementById('stockCanvas');
+        const ctx = canvas.getContext('2d');
+        const statusPanel = document.getElementById('status-panel');
+        const errorBoundary = document.getElementById('error-boundary');
+
+        // State variables
+        let appState = 'LOADING'; // LOADING, ACTIVE, ERROR
+        let elementX = 150;
+        let elementY = 150;
+        const elementWidth = 80;
+        const elementHeight = 40;
+        let isDragging = false;
+        let dragStartX = 0;
+        let originalElementX = 0;
+        let balance = 0;
+
+        // Initial paint: loading state (gray)
+        function render() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            if (appState === 'LOADING') {
+                ctx.fillStyle = 'rgb(128, 128, 128)'; // Gray loading threshold
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                
+                ctx.fillStyle = '#ffffff';
+                ctx.font = '16px sans-serif';
+                ctx.textAlign = 'center';
+                ctx.fillText('CONNECTING TO STREAM...', canvas.width / 2, canvas.height / 2);
+            } 
+            else if (appState === 'ACTIVE') {
+                // Render stock terminal grid background
+                ctx.strokeStyle = '#1e293b';
+                ctx.lineWidth = 1;
+                for (let i = 0; i < canvas.width; i += 40) {
+                    ctx.beginPath();
+                    ctx.moveTo(i, 0);
+                    ctx.lineTo(i, canvas.height);
+                    ctx.stroke();
+                    ctx.beginPath();
+                    ctx.moveTo(0, i);
+                    ctx.lineTo(canvas.width, i);
+                    ctx.stroke();
+                }
+                
+                // Draw active target block (solid green)
+                ctx.fillStyle = 'rgb(0, 200, 100)'; // Active color layout
+                ctx.fillRect(elementX, elementY, elementWidth, elementHeight);
+                
+                // Text label on block
+                ctx.fillStyle = '#ffffff';
+                ctx.font = '12px monospace';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(`$${balance}`, elementX + elementWidth / 2, elementY + elementHeight / 2);
+            } 
+            else if (appState === 'ERROR') {
+                ctx.fillStyle = 'rgb(128, 0, 0)'; // Red screen for error boundary
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                
+                ctx.fillStyle = '#ffffff';
+                ctx.font = '16px sans-serif';
+                ctx.textAlign = 'center';
+                ctx.fillText('STREAM CORRUPTED', canvas.width / 2, canvas.height / 2);
+            }
+        }
+
+        render();
+
+        // WebSocket Connection
+        const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const wsUrl = `${wsProtocol}//${window.location.host}/ws`;
+        const socket = new WebSocket(wsUrl);
+
+        socket.onopen = () => {
+            statusPanel.innerText = 'System Status: Connected, waiting for active signal...';
+        };
+
+        socket.onmessage = (event) => {
+            try {
+                const data = JSON.parse(event.data);
+                
+                // Mismatched Server Boundary Checking
+                if (data.balance !== undefined) {
+                    // Try to parse the balance safely.
+                    // If the balance is a string like "1e+7" or scientific notation,
+                    // we simulate a validator that checks for float conversions and detects data anomalies.
+                    const rawBalance = data.balance;
+                    
+                    // We deliberately throw an exception if the format is corrupted (e.g. contains scientific notation or floats)
+                    if (typeof rawBalance === 'string' && (rawBalance.includes('e') || rawBalance.includes('E') || rawBalance.includes('.'))) {
+                        throw new TypeError('Mismatched boundary format detected: balance cannot be a float or scientific notation string.');
+                    }
+                    
+                    const parsed = parseInt(rawBalance, 10);
+                    if (isNaN(parsed) || parsed > 1000000) {
+                        throw new RangeError('Balance value exceeds safety limit (1,000,000).');
+                    }
+                    
+                    balance = parsed;
+                }
+                
+                if (data.status === 'ACTIVE') {
+                    appState = 'ACTIVE';
+                    if (data.x !== undefined) elementX = data.x;
+                    if (data.y !== undefined) elementY = data.y;
+                    statusPanel.innerText = `System Status: Active. Balance: $${balance}`;
+                    render();
+                }
+            } catch (err) {
+                // Trigger structured exception boundary UI
+                console.error(err);
+                appState = 'ERROR';
+                errorBoundary.innerText = `FATAL EXCEPTION: ${err.message}`;
+                errorBoundary.style.display = 'block';
+                statusPanel.innerText = 'System Status: Disconnected (Exception Boundary Triggered)';
+                render();
+            }
+        };
+
+        socket.onclose = () => {
+            if (appState !== 'ERROR') {
+                statusPanel.innerText = 'System Status: WebSocket Connection Closed';
+            }
+        };
+
+        // Mouse Interactions for Drag & Drop
+        function getMousePos(evt) {
+            const rect = canvas.getBoundingClientRect();
+            return {
+                x: evt.clientX - rect.left,
+                y: evt.clientY - rect.top
+            };
+        }
+
+        function isInsideElement(pos) {
+            return pos.x >= elementX && pos.x <= elementX + elementWidth &&
+                   pos.y >= elementY && pos.y <= elementY + elementHeight;
+        }
+
+        canvas.addEventListener('mousedown', (evt) => {
+            if (appState !== 'ACTIVE') return;
+            const mousePos = getMousePos(evt);
+            if (isInsideElement(mousePos)) {
+                isDragging = true;
+                dragStartX = mousePos.x;
+                originalElementX = elementX;
+            }
+        });
+
+        canvas.addEventListener('mousemove', (evt) => {
+            if (appState !== 'ACTIVE') return;
+            const mousePos = getMousePos(evt);
+            
+            // Visual indicator on hover
+            if (isInsideElement(mousePos)) {
+                canvas.style.cursor = 'pointer';
+            } else {
+                canvas.style.cursor = 'default';
+            }
+
+            if (isDragging) {
+                const deltaX = mousePos.x - dragStartX;
+                elementX = originalElementX + deltaX;
+                render();
+            }
+        });
+
+        canvas.addEventListener('mouseup', (evt) => {
+            if (isDragging) {
+                isDragging = false;
+                statusPanel.innerText = `System Status: Dragged element to X:${elementX}`;
+                // Send action back to server
+                socket.send(JSON.stringify({
+                    action: 'DRAG_COMPLETE',
+                    newX: elementX
+                }));
+            }
+        });
+
+        canvas.addEventListener('click', (evt) => {
+            if (appState !== 'ACTIVE') return;
+            const mousePos = getMousePos(evt);
+            if (isInsideElement(mousePos)) {
+                statusPanel.innerText = 'System Status: Transaction Finalized!';
+                socket.send(JSON.stringify({
+                    action: 'CLICK_COMPLETE'
+                }));
+            }
+        });
+    </script>
+</body>
+</html>
