@@ -7,11 +7,13 @@
 - **LinkedIn Profile Link**: [linkedin.com/in/abhaykumarsingh7006](https://www.linkedin.com/in/abhaykumarsingh7006)
 - **Resume Download Link (PDF)**: [Resume Download](https://drive.google.com/file/d/1wx99aJLgOe4ocaWJSPaOuYOEhHNoFJPN/view?usp=sharing)
 - **Technical Repositories & Profiles**: 
-  - GitHub: [github.com/Abhay52004](https://github.com/Abhay52004)
+  - GitHub Profile: [github.com/Abhay52004](https://github.com/Abhay52004)
+  - Project Repository: [FrugalTestingAssignment on GitHub](https://github.com/Abhay52004/FrugalTestingAssignment)
   - LeetCode: [leetcode.com/u/Sanger_70/](https://leetcode.com/u/Sanger_70/)
 - **Outstanding System Projects**:
-  - *Playwright Advanced Interceptor*: Distributed WebSocket Jitter and Fault Injection test harness.
-  - *Zero-Trust MCP Sandbox Proxy*: Secure token-limited logger interface for LLM command isolation.
+  - *FrugalTestingAssignment*: Dynamic Web/API Test Automation Suite with WebSocket and HMAC security mocks.
+  - *ParkEasy*: Full-Stack Parking Management platform with Docker containerization and AWS deployment.
+  - *FeatureForge*: Real-time deployment rollouts manager containerized and orchestrated via Kubernetes.
 
 ### 2. Social Engagement Proof
 - **LinkedIn Page followed**: [Frugal Testing LinkedIn](https://www.linkedin.com/company/frugaltesting/)
